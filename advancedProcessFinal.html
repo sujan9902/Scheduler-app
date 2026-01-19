@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCOPE | Multicore Comparative Process Engine</title>
+    <!-- Tailwind CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+        
+        :root {
+            --bg-void: #010409; /* True obsidian black */
+            --glass-surface: rgba(13, 17, 23, 0.85);
+            --glass-border: rgba(56, 189, 248, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-void);
+            color: #e0f2fe;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.05) 0px, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
+                linear-gradient(180deg, #010409 0%, #000000 100%);
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* --- DEEP BLUE OBSIDIAN GLASS --- */
+        .glass {
+            background: var(--glass-surface);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.8),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+        }
+
+        /* --- GLOSSY BLUE MAIN HEADING --- */
+        .heading-mcope {
+            background: linear-gradient(to bottom, #7dd3fc, #0ea5e9, #0369a1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+            filter: drop-shadow(0 0 20px rgba(14, 165, 233, 0.4));
+        }
+
+        /* --- COLORFUL COMPONENT HEADINGS --- */
+        .text-gradient-cyan { background: linear-gradient(135deg, #22d3ee, #0ea5e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(34,211,238,0.4)); }
+        .text-gradient-emerald { background: linear-gradient(135deg, #34d399, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(52,211,153,0.4)); }
+        .text-gradient-pink { background: linear-gradient(135deg, #f472b6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(244,114,182,0.4)); }
+        .text-gradient-amber { background: linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(251,191,36,0.4)); }
+        .text-gradient-indigo { background: linear-gradient(135deg, #818cf8, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(129,140,248,0.4)); }
+        .text-gradient-purple { background: linear-gradient(135deg, #c084fc, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(192,132,252,0.4)); }
+
+        @keyframes deep-flow { to { background-position: 200% center; } }
+
+        /* --- SECTION VIEW MANAGEMENT --- */
+        .view-section { display: block; opacity: 1; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .view-hidden { display: none !important; opacity: 0; transform: translateY(10px); pointer-events: none; }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 280px;
+            z-index: 100;
+            transform: translateX(-270px);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(2, 6, 23, 0.98);
+            border-right: 1px solid rgba(56, 189, 248, 0.1);
+            backdrop-filter: blur(30px);
+            box-shadow: 10px 0 50px rgba(0,0,0,0.9);
+        }
+        #sidebar:hover { transform: translateX(0); }
+
+        .sidebar-item { position: relative; cursor: pointer; transition: all 0.3s; border-left: 3px solid transparent; }
+        .sidebar-item:hover, .sidebar-item.active {
+            background: linear-gradient(90deg, rgba(14, 165, 233, 0.15), transparent);
+            border-left-color: #38bdf8;
+            padding-left: 2.5rem;
+            color: #38bdf8;
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        /* --- UI COMPONENTS --- */
+        .custom-range { -webkit-appearance: none; width: 100%; height: 6px; background: #0f172a; border-radius: 10px; outline: none; }
+        .custom-range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #38bdf8; border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px #0ea5e9; }
+
+        .btn-obsidian { background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); color: #bae6fd; transition: all 0.3s; }
+        .btn-obsidian:hover { background: #0ea5e9; color: white; box-shadow: 0 0 20px rgba(14, 165, 233, 0.5); transform: translateY(-1px); }
+
+        .stat-box { background: linear-gradient(160deg, rgba(13, 17, 23, 0.8), rgba(2, 6, 23, 0.9)); border: 1px solid rgba(255,255,255,0.05); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-cyan { 0%, 100% { box-shadow: 0 0 10px rgba(34, 211, 238, 0.2); } 50% { box-shadow: 0 0 25px rgba(34, 211, 238, 0.4); } }
+        .animate-pulse-cyan { animation: pulse-cyan 2s infinite; }
+
+        .progress-ring__circle { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        
+        .formula-box {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        .gantt-track { scrollbar-width: none; -ms-overflow-style: none; overflow-x: hidden; }
+        .gantt-track::-webkit-scrollbar { display: none; }
+
+        .time-label {
+            min-width: 24px;
+            text-align: center;
+            font-size: 8px;
+            color: #475569;
+            border-left: 1px solid rgba(255,255,255,0.05);
+            font-weight: 600;
+        }
+
+        /* Prevent overlap in baseline demo */
+        #referenceTrack, #referenceTimeLabels { position: relative; z-index: 10; }
+        
+        /* Process Block Styling */
+        .gantt-block {
+            min-width: 24px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.9);
+            border-right: 1px solid rgba(0,0,0,0.1);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: inset 0 10px 10px -5px rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 pl-14 min-h-screen relative">
+
+    <!-- NAVIGATION SIDEBAR -->
+    <nav id="sidebar" class="flex flex-col py-10">
+        <div class="px-8 mb-12 text-center">
+            <h2 class="text-3xl font-black heading-mcope tracking-tighter uppercase italic">MCOPE</h2>
+            <div class="h-0.5 w-16 bg-blue-500 mt-2 mx-auto shadow-[0_0_20px_#3b82f6]"></div>
+        </div>
+
+        <div class="flex flex-col space-y-2">
+            <div onclick="switchView('simulator')" id="nav-sim" class="sidebar-item active px-10 py-5 flex items-center gap-4 text-xs font-black uppercase tracking-[0.25em]">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2zm0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Simulator
+            </div>
+            <div onclick="switchView('theory')" id="nav-theory" class="sidebar-item px-10 py-5 flex items-center gap-4 text-xs font-black uppercase tracking-[0.25em] text-slate-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                Theory Hub
+            </div>
+        </div>
+
+        <div class="mt-auto px-10 py-10 opacity-40 text-center">
+            <div class="text-[9px] font-black uppercase tracking-widest text-blue-500">MCOPE OBSIDIAN beta v1.1</div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+        
+        <!-- SIMULATOR VIEW -->
+        <div id="view-simulator" class="view-section">
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                <div class="relative group cursor-default">
+                    <div class="absolute -inset-6 bg-blue-600/10 rounded-full blur-3xl opacity-50"></div>
+                    <div class="relative">
+                        <h1 class="text-7xl md:text-8xl font-black tracking-tighter heading-mcope uppercase leading-none drop-shadow-2xl">MCOPE</h1>
+                        <div class="mt-4 space-y-1">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2 py-0.5 bg-blue-700 text-white text-[10px] font-black uppercase rounded tracking-tighter shadow-lg">Core Engine</span>
+                                <p class="font-extrabold tracking-tight text-xl md:text-2xl italic text-blue-200">Multicore Comparative Process Engine</p>
+                            </div>
+                            <p class="font-bold text-[10px] uppercase tracking-[0.3em] mono text-slate-500">OS Miniproject <br> [Sameera D Upadhya • Sujan LR • Rohan Gowda]</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 relative z-10">
+                    <button id="startBtn" class="btn-obsidian px-8 py-3 rounded-2xl font-bold flex items-center gap-2 text-xs uppercase tracking-widest shadow-lg">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Simulate
+                    </button>
+                    <button id="pauseBtn" class="hidden btn-obsidian px-8 py-3 bg-amber-500/20 hover:bg-amber-600 border-amber-500/50 text-amber-300 rounded-2xl font-bold items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> Pause
+                    </button>
+                    <button id="resetBtn" class="btn-obsidian px-8 py-3 bg-slate-900/50 hover:bg-slate-800/50 border-slate-700 rounded-2xl font-bold flex items-center gap-2 text-xs uppercase tracking-widest text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Reset
+                    </button>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <aside class="lg:col-span-4 space-y-6">
+                    <!-- ARCHITECT -->
+                    <div class="glass p-6 rounded-[2.5rem] hover:border-cyan-500/50 transition-all shadow-[0_0_30px_rgba(34,211,238,0.05)]">
+                        <h2 class="text-lg font-black mb-6 flex items-center gap-3 uppercase tracking-widest text-gradient-cyan">
+                            <div class="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg></div> Architect
+                        </h2>
+                        <div class="space-y-5">
+                            <div class="bg-black/40 p-4 rounded-3xl border border-white/5">
+                                <label class="text-[9px] uppercase font-black text-slate-500 tracking-widest mb-2 block">Scheduling Logic</label>
+                                <select id="algoSelect" class="w-full bg-[#020617] border border-slate-800 rounded-xl p-3 text-xs text-cyan-100 font-bold outline-none">
+                                    <optgroup label="Non-Preemptive" class="bg-slate-900"><option value="FCFS">First Come First Served</option><option value="SJF_NP">Shortest Job First</option><option value="PRIO_NP">Priority (NP)</option></optgroup>
+                                    <optgroup label="Preemptive" class="bg-slate-900"><option value="SRTF">SRTF (Preemptive SJF)</option><option value="PRIO_P">Priority (Preemptive)</option><option value="RR">Round Robin</option></optgroup>
+                                </select>
+                            </div>
+                            <div id="quantumContainer" class="hidden animate-pulse bg-purple-500/5 p-4 rounded-3xl border border-purple-500/20">
+                                <label class="text-[9px] uppercase font-black text-purple-400 tracking-widest mb-2 block">Quantum</label>
+                                <input type="number" id="quantumInput" value="2" min="1" class="w-full bg-[#020617] border border-purple-900/30 rounded-xl p-3 text-xs text-purple-100 font-bold">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-black/40 p-4 rounded-3xl border border-white/5"><label class="text-[9px] uppercase font-black text-slate-500 tracking-widest mb-2 block">Cores</label><select id="coreSelect" class="w-full bg-[#020617] border border-slate-800 rounded-xl p-3 text-xs font-bold text-cyan-400"><option value="2">2</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12" selected>12</option></select></div>
+                                <div class="bg-black/40 p-4 rounded-3xl border border-white/5"><label class="text-[9px] uppercase font-black text-slate-500 tracking-widest mb-2 block">Queueing</label><select id="queueMode" class="w-full bg-[#020617] border border-slate-800 rounded-xl p-3 text-xs font-bold text-cyan-400"><option value="global" selected>Global Pool</option><option value="local">Local Queues</option></select></div>
+                            </div>
+                            <div class="bg-black/40 p-4 rounded-3xl border border-white/5"><div class="flex justify-between items-center mb-3"><label class="text-[9px] uppercase font-black text-slate-500 tracking-widest">Freq</label><span id="clockValDisplay" class="text-xs font-bold text-cyan-300 mono">2.5 GHz</span></div><input type="range" id="clockInput" min="1.0" max="6.5" step="0.1" value="2.5" class="w-full custom-range"></div>
+                        </div>
+                    </div>
+
+                    <!-- DISPATCHER (Emerald) -->
+                    <div class="glass p-6 rounded-[2.5rem] hover:border-emerald-500/50 transition-all shadow-[0_0_30px_rgba(16,185,129,0.05)]">
+                        <h2 class="text-lg font-black mb-6 flex items-center justify-between text-gradient-emerald uppercase"><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>Dispatcher</div><span class="px-2 py-0.5 rounded text-emerald-300 text-[8px] font-black border border-emerald-500/30 bg-emerald-500/10">REAL-TIME</span></h2>
+                        <div id="dispatchGraphical" class="grid grid-cols-3 gap-3"></div>
+                    </div>
+
+                    <!-- WORKLOAD (Pink) -->
+                    <div class="glass p-6 rounded-[2.5rem] hover:border-pink-500/50 transition-all shadow-[0_0_30px_rgba(244,114,182,0.05)]">
+                        <div class="flex justify-between items-center mb-5"><h2 class="text-lg font-black text-gradient-pink uppercase">Workload</h2><button id="randomBtn" class="btn-obsidian text-[9px] px-3 py-1.5 rounded-lg font-black uppercase text-pink-300 border-pink-500/30">+ Auto</button></div>
+                        <div class="max-h-[280px] overflow-y-auto space-y-3 pr-2 no-scrollbar" id="processList"></div>
+                        <button id="addProcessBtn" class="w-full mt-5 border border-dashed border-slate-700 hover:border-pink-500 hover:bg-pink-500/5 text-slate-500 hover:text-pink-400 py-3 rounded-2xl transition-all text-[9px] font-black uppercase tracking-[0.2em]">+ Manual Deploy</button>
+                    </div>
+                </aside>
+
+                <main class="lg:col-span-8 space-y-6">
+                    <!-- READY QUEUE (Amber) -->
+                    <div id="queueVizContainer" class="glass p-6 rounded-[2rem] border-t-2 border-t-amber-500/30 relative overflow-hidden">
+                        <div class="relative">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-xs font-black text-slate-300 uppercase tracking-[0.2em] flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_10px_orange]"></div><span id="queueVizTitle" class="text-gradient-amber">Ready Queue Monitor</span></h3>
+                                <span class="text-[8px] font-mono text-amber-400 bg-black/50 px-2 py-1 rounded border border-amber-500/20">BUFFER ACTIVE</span>
+                            </div>
+                            <div id="queueVizTrack" class="flex gap-2 min-h-[50px] items-center overflow-x-auto no-scrollbar py-2">
+                                <div class="text-[10px] text-slate-600 font-mono w-full text-center tracking-widest opacity-70 italic uppercase">Awaiting Input...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4" id="cpuGrid"></div>
+                    
+                    <!-- GANTT TABLE (Indigo) -->
+                    <div class="glass p-8 rounded-[3rem] space-y-6 overflow-hidden hover:border-indigo-500/40 transition-all shadow-[0_0_40px_rgba(99,102,241,0.05)]">
+                        <h2 class="text-2xl font-black flex items-center justify-between text-gradient-indigo uppercase"><div class="flex items-center gap-4"><div class="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20"><svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>Execution Timeline</div><span id="currentTimeDisplay" class="text-sm font-black mono bg-black/50 border border-indigo-500/30 px-5 py-2 rounded-full text-indigo-400 shadow-inner">Cycle: 0</span></h2>
+                        
+                        <div class="bg-black/40 p-6 rounded-[2rem] border border-white/5 mb-4">
+                            <div class="flex justify-between items-center mb-4"><span class="text-[9px] uppercase font-black text-slate-500 tracking-[0.2em]">Master Chrono Synchronizer</span><span id="navInfo" class="text-[9px] mono text-indigo-400 font-bold bg-indigo-500/5 px-3 py-1 rounded-lg border border-indigo-500/10">Range: 0 - 0</span></div>
+                            <input type="range" id="timelineNavigator" min="0" max="0" value="0" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-indigo-500 custom-range">
+                        </div>
+                        
+                        <div id="ganttContainer" class="space-y-4 pt-4 overflow-hidden"></div>
+                        
+                        <div class="pt-8 mt-10 border-t border-slate-800/50">
+                            <div class="flex items-center gap-3 mb-4"><span class="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">Single Core Baseline Demo</span><div class="h-px flex-1 bg-slate-800/30"></div></div>
+                            <div id="referenceTrack" class="gantt-track flex h-14 bg-[#010409] rounded-2xl border border-white/5 overflow-x-hidden"></div>
+                            <div id="referenceTimeLabels" class="flex h-4 opacity-50 time-labels-container mt-1 overflow-x-hidden"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-center">
+                        <div class="glass stat-box p-6 rounded-[2rem] border-l-4 border-l-cyan-500 hover:border-cyan-500/50 transition-all"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Avg Wait</p><p class="text-4xl font-black mono text-cyan-200" id="avgWait">0.00</p></div>
+                        <div class="glass stat-box p-6 rounded-[2rem] border-l-4 border-l-emerald-500 hover:border-emerald-500/50 transition-all"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Avg TAT</p><p class="text-4xl font-black mono text-emerald-200" id="avgTat">0.00</p></div>
+                        <div class="glass stat-box p-6 rounded-[2rem] border-l-4 border-l-pink-500 hover:border-pink-500/50 transition-all"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Avg Completion</p><p class="text-4xl font-black mono text-pink-200" id="avgCtMulti">0.00</p></div>
+                        <div class="glass stat-box p-6 rounded-[2rem] border-l-4 border-l-amber-500 hover:border-amber-500/50 transition-all"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Single Core Total</p><p class="text-4xl font-black mono text-amber-200" id="totalTimeRef">0</p></div>
+                    </div>
+
+                    <!-- PERFORMANCE SCORE -->
+                    <div class="glass p-8 rounded-[3rem] border-t border-t-white/10 relative overflow-hidden group/eff">
+                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-900/10 via-transparent to-blue-900/10 opacity-0 group-hover/eff:opacity-100 transition-opacity duration-1000"></div>
+                        <div class="relative flex justify-between items-end mb-6">
+                            <div class="transition-transform group-hover/eff:translate-x-1">
+                                <p class="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-1 group-hover:text-cyan-400">Parallel Efficiency Ratio</p>
+                                <p class="text-[10px] font-medium text-slate-600 italic">Sequential Execution / Multicore Completion Ratio</p>
+                            </div>
+                            <p class="text-5xl font-black mono text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-500 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]" id="utilization">0%</p>
+                        </div>
+                        <div class="w-full bg-black h-10 rounded-full overflow-hidden border border-white/5 p-1.5 shadow-inner">
+                            <div id="utilBar" class="h-full bg-gradient-to-r from-cyan-600 via-blue-500 to-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_30px_rgba(56,189,248,0.5)]" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- THEORY HUB VIEW -->
+        <div id="view-theory" class="view-section view-hidden">
+            <header class="mb-16"><h1 class="text-6xl font-black heading-mcope uppercase tracking-tighter italic">Theory intelligence Hub</h1></header>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 pb-24">
+                <div class="space-y-8">
+                    <h3 class="text-xl font-bold text-gradient-amber flex items-center gap-4"><span class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-sm shadow-[0_0_20px_rgba(251,191,36,0.2)]">01</span> Math Intelligence</h3>
+                    <div class="glass p-8 rounded-3xl border-l-2 border-amber-500 mb-6"><h4 class="text-amber-400 font-bold mb-3 uppercase text-[10px]">TAT & WT</h4><div class="formula-box">TAT = CT - AT <br> WT = TAT - BT</div></div>
+                    <div class="glass p-8 rounded-3xl border-l-2 border-cyan-500 mb-6"><h4 class="text-cyan-400 font-bold mb-3 uppercase text-[10px]">Response Time</h4><div class="formula-box">RT = First_Execution_Cycle - AT</div></div>
+                    <div class="glass p-8 rounded-3xl border-l-2 border-indigo-500 mb-6"><h4 class="text-indigo-400 font-bold mb-3 uppercase text-[10px]">Parallel Speedup</h4><div class="formula-box">Speedup = Sequential_Time / Multicore_Time</div></div>
+                </div>
+
+                <div class="space-y-8">
+                    <h3 class="text-xl font-bold text-gradient-emerald flex items-center gap-4"><span class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-sm shadow-[0_0_16px_rgba(16,185,129,0.2)]">02</span> Scheduling Logic</h3>
+                    <div class="glass p-6 rounded-3xl border-l-4 border-cyan-500 mb-4 hover:bg-cyan-950/20 transition-all"><h4 class="text-cyan-400 font-bold mb-2 uppercase text-[10px]">FCFS</h4><p class="text-xs text-slate-400 leading-relaxed">First-Come, First-Served. Executed in arrival order. Prone to the "Convoy Effect".</p></div>
+                    <div class="glass p-6 rounded-3xl border-l-4 border-emerald-500 mb-4 hover:bg-emerald-950/20 transition-all"><h4 class="text-emerald-400 font-bold mb-2 uppercase text-[10px]">SJF & SRTF</h4><p class="text-xs text-slate-400 leading-relaxed"><b>SJF:</b> Smallest burst (NP). <b>SRTF:</b> Preemptive switching based on remaining time.</p></div>
+                    <div class="glass p-6 rounded-3xl border-l-4 border-pink-500 mb-4 hover:bg-pink-950/20 transition-all"><h4 class="text-pink-400 font-bold mb-2 uppercase text-[10px]">Round Robin</h4><p class="text-xs text-slate-400 leading-relaxed">Time-sharing using a fixed <b>Time Quantum</b> for fair CPU distribution.</p></div>
+                    <div class="glass p-6 rounded-3xl border-l-4 border-purple-500 transition-all"><h4 class="text-purple-400 font-bold mb-2 uppercase text-[10px]">Priority Scheduling</h4><p class="text-xs text-slate-400 leading-relaxed">CPU allocation based on task rank; higher rank pre-empts lower rank threads.</p></div>
+                </div>
+
+                <div class="md:col-span-2 space-y-8">
+                    <h3 class="text-xl font-bold text-gradient-purple flex items-center gap-4"><span class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-sm shadow-[0_0_20px_rgba(168,85,247,0.2)]">03</span> Architecture & Queueing</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="glass p-6 rounded-3xl border-t-2 border-purple-500"><h4 class="text-purple-400 font-bold mb-3 uppercase text-[10px]">Queue Strategies</h4><p class="text-xs text-slate-400 leading-relaxed"><b>Global Pool:</b> Shared pool for all cores. Balanced load but high locking overhead.<br><b>Local Queues:</b> Core-specific buffers for better locality.</p></div>
+                        <div class="glass p-6 rounded-3xl border-t-2 border-violet-500"><h4 class="text-violet-400 font-bold mb-3 uppercase text-[10px]">Load Balancing</h4><p class="text-xs text-slate-400 leading-relaxed">OS moves tasks from busy to idle cores using <b>Push/Pull migration</b> strategies to avoid core saturation.</p></div>
+                        <div class="glass p-6 rounded-3xl border-t-2 border-fuchsia-500"><h4 class="text-fuchsia-400 font-bold mb-3 uppercase text-[10px]">Parallel IPC</h4><p class="text-xs text-slate-400 leading-relaxed">Increasing Instructions Per Clock (IPC) in parallel to bypass thermal limits of high single-core frequencies.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="addModalOverlay" class="fixed inset-0 bg-black/90 hidden z-[200] flex items-center justify-center p-4 backdrop-blur-xl">
+        <div class="glass border-t-2 border-blue-500 p-10 rounded-[3rem] max-w-sm w-full shadow-2xl scale-95 animate-in fade-in zoom-in duration-300">
+            <h3 class="text-2xl font-black mb-8 heading-mcope uppercase text-center tracking-tighter">Process Assembly</h3>
+            <div class="space-y-6 mb-8">
+                <!-- Arrival -->
+                <div class="bg-black/50 p-5 rounded-3xl border border-white/5 focus-within:border-cyan-500/50 transition-colors flex items-center gap-4">
+                    <div class="p-3 bg-cyan-500/10 rounded-2xl text-cyan-400 border border-cyan-500/20"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                    <div class="flex-1"><label class="text-[9px] uppercase font-black text-slate-500 mb-1 block">Arrival Cycle</label><input type="number" id="manualArrival" value="0" min="0" class="w-full bg-transparent border-none p-0 text-2xl font-black focus:ring-0 outline-none text-cyan-400 mono"></div>
+                </div>
+                <!-- Burst -->
+                <div class="bg-black/50 p-5 rounded-3xl border border-white/5 focus-within:border-blue-500/50 transition-colors flex items-center gap-4">
+                    <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-400 border border-blue-500/20"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+                    <div class="flex-1"><label class="text-[9px] uppercase font-black text-slate-500 mb-1 block">Burst Units</label><input type="number" id="manualBurst" value="5" min="1" class="w-full bg-transparent border-none p-0 text-2xl font-black focus:ring-0 outline-none text-blue-400 mono"></div>
+                </div>
+                <!-- Priority -->
+                <div class="bg-black/50 p-5 rounded-3xl border border-white/5 focus-within:border-indigo-500/50 transition-colors flex items-center gap-4">
+                    <div class="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400 border border-indigo-500/20"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                    <div class="flex-1"><label class="text-[9px] uppercase font-black text-slate-500 mb-1 block">Priority Rank</label><input type="number" id="manualPriority" value="1" min="1" class="w-full bg-transparent border-none p-0 text-2xl font-black focus:ring-0 outline-none text-indigo-400 mono"></div>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="closeAddModal()" class="flex-1 py-4 bg-slate-900 hover:bg-slate-800 rounded-2xl font-black uppercase text-xs text-slate-400 transition-colors">Abort</button>
+                <button id="confirmAddBtn" class="flex-1 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl font-black uppercase text-xs shadow-lg text-white transition-all font-bold">Deploy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION MODAL -->
+    <div id="modalOverlay" class="fixed inset-0 bg-black/95 hidden z-[200] flex items-center justify-center p-4 backdrop-blur-xl">
+        <div class="glass border-t-2 border-sky-500 p-10 rounded-[3.5rem] max-w-sm w-full text-center shadow-2xl">
+            <div class="w-20 h-20 bg-sky-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-sky-500/20 shadow-[0_0_40px_rgba(56,189,248,0.15)]"><svg class="w-10 h-10 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></div>
+            <h3 id="modalTitle" class="text-3xl font-black text-blue-200 uppercase mb-2"></h3>
+            <p id="modalMsg" class="text-slate-400 mb-10 text-sm leading-relaxed"></p>
+            <button onclick="closeModal()" class="w-full py-5 bg-gradient-to-r from-sky-600 to-blue-600 rounded-3xl font-black uppercase text-xs tracking-[0.3em] text-white shadow-xl">Close Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        function switchView(vid) {
+            const sm = document.getElementById('view-simulator'), th = document.getElementById('view-theory');
+            const ns = document.getElementById('nav-sim'), nt = document.getElementById('nav-theory');
+            if (!sm || !th || !ns || !nt) return;
+            if (vid === 'simulator') { sm.classList.remove('view-hidden'); th.classList.add('view-hidden'); ns.classList.add('active', 'text-cyan-400'); nt.classList.remove('active'); }
+            else { sm.classList.add('view-hidden'); th.classList.remove('view-hidden'); nt.classList.add('active', 'text-cyan-400'); ns.classList.remove('active'); }
+        }
+
+        // --- SCHEDULING ENGINE ---
+        let processes = [], simulationRunning = false, currentTime = 0, timer = null, cores = [], refProcesses = [], referenceCore = null;
+        // 30 High-Contrast, Distinct Vibrant Colors for processes
+        const COLORS = [
+            '#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff4500', '#1e90ff', '#ff1493', '#32cd32', 
+            '#ff8c00', '#8a2be2', '#00ced1', '#ff0000', '#ffd700', '#adff2f', '#da70d6', '#7cfc00', 
+            '#00fa9a', '#4169e1', '#f08080', '#20b2aa', '#ba55d3', '#f4a460', '#9370db', '#3cb371', 
+            '#fa8072', '#40e0d0', '#ee82ee', '#6495ed', '#bdb76b', '#ff6347'
+        ];
+
+        class Process { constructor(id, ar, bt, pr, cl) { this.id = id; this.arrivalTime = parseInt(ar) || 0; this.burstTime = parseInt(bt) || 1; this.totalBurst = this.burstTime; this.remainingTime = this.burstTime; this.priority = parseInt(pr) || 1; this.color = cl; this.startTime = -1; this.endTime = 0; this.waitingTime = 0; this.turnaroundTime = 0; } }
+        class Core { constructor(id) { this.id = id; this.currentProcess = null; this.timeline = []; this.totalActiveTime = 0; this.localQueue = []; this.rrCounter = 0; } }
+
+        function createProgressRing(id) { return `<svg class="progress-ring" width="44" height="44"><circle class="progress-ring__background" stroke="#020617" stroke-width="4" fill="transparent" r="18" cx="22" cy="22"/><circle id="ring-circle-${id}" class="progress-ring__circle" stroke="currentColor" stroke-width="4" stroke-dasharray="113.1" stroke-dashoffset="113.1" stroke-linecap="round" fill="transparent" r="18" cx="22" cy="22"/></svg>`; }
+        function updateProgressRing(id, pct, clr) { const el = document.getElementById(`ring-circle-${id}`); if (!el) return; el.style.strokeDashoffset = 113.1 - (Math.min(100, Math.max(0, pct)) / 100 * 113.1); el.style.color = clr; }
+
+        function initCores() {
+            const cs = document.getElementById('coreSelect'); if(!cs) return;
+            const count = parseInt(cs.value); cores = []; 
+            const cg = document.getElementById('cpuGrid'); if(cg) cg.innerHTML = '';
+            const gtc = document.getElementById('ganttContainer'); if(gtc) gtc.innerHTML = '';
+            const dg = document.getElementById('dispatchGraphical'); if(dg) dg.innerHTML = '';
+            const rt = document.getElementById('referenceTrack'); if(rt) rt.innerHTML = '';
+            const rl = document.getElementById('referenceTimeLabels'); if(rl) rl.innerHTML = '';
+
+            for (let i = 0; i < count; i++) {
+                cores.push(new Core(i));
+                const coreCard = document.createElement('div');
+                coreCard.id = `core-card-${i}`; coreCard.className = 'glass p-4 rounded-[2rem] relative border border-white/5 transition-all flex flex-col justify-between h-24 overflow-hidden group hover:scale-[1.05] hover:border-cyan-500/30';
+                coreCard.innerHTML = `<div class="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div><div class="relative flex justify-between items-center"><span class="text-[9px] font-black px-2 py-1 bg-black/60 rounded-lg text-slate-400 uppercase border border-white/5">Core ${i+1}</span><div id="indicator-${i}" class="w-2 h-2 rounded-full bg-slate-800 transition-colors"></div></div><div id="status-${i}" class="relative text-[11px] font-black text-slate-500 uppercase truncate mt-2 group-hover:text-slate-300">IDLE</div>`;
+                if(cg) cg.appendChild(coreCard);
+                
+                const trackWrapper = document.createElement('div');
+                trackWrapper.className = 'space-y-1 group/track';
+                trackWrapper.innerHTML = `<div class="flex justify-between items-center px-1"><span class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] group-hover/track:text-cyan-300 transition-colors">Core Unit ${i+1}</span><span id="core-util-${i}" class="text-[9px] font-bold text-blue-400 mono">0% Load</span></div><div id="track-${i}" class="gantt-track flex h-10 bg-black/40 rounded-xl overflow-x-hidden border border-white/5 group-hover/track:border-cyan-500/20 transition-colors"></div><div id="labels-${i}" class="flex overflow-x-hidden pointer-events-none no-scrollbar time-labels-container h-4 opacity-30"></div>`;
+                if(gtc) gtc.appendChild(trackWrapper);
+                
+                const dCore = document.createElement('div');
+                dCore.id = `dispatch-core-${i}`; dCore.className = 'bg-black/40 border border-slate-800 p-3 rounded-2xl flex flex-col items-center justify-center relative hover:border-cyan-500/30 transition-all';
+                dCore.innerHTML = `<div class="text-[8px] font-black text-slate-600 uppercase mb-2">C${i+1}</div><div class="relative flex items-center justify-center">${createProgressRing(i)}<div id="dispatch-proc-id-${i}" class="absolute text-[11px] font-black text-slate-700 mono">OFF</div></div></div>`;
+                if(dg) dg.appendChild(dCore);
+            }
+            const dBaseline = document.createElement('div');
+            dBaseline.id = 'dispatch-core-ref'; dBaseline.className = 'bg-amber-950/20 border border-amber-900/30 p-3 rounded-2xl flex flex-col items-center justify-center relative hover:border-amber-500/30 transition-all col-span-1';
+            dBaseline.innerHTML = `<div class="text-[8px] font-black text-amber-500 uppercase mb-2">BASE</div><div class="relative flex items-center justify-center">${createProgressRing('ref')}<div id="dispatch-proc-id-ref" class="absolute text-[11px] font-black text-amber-900 mono">OFF</div></div></div>`;
+            if(dg) dg.appendChild(dBaseline);
+            referenceCore = new Core('REF');
+        }
+
+        function renderProcessList() { 
+            const list = document.getElementById('processList'); if(!list) return; list.innerHTML = ''; 
+            processes.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'group flex items-center gap-4 p-4 bg-black/40 border border-white/5 rounded-3xl transition-all hover:bg-black/60 hover:border-cyan-500/20 hover:scale-[1.02]';
+                div.innerHTML = `<div class="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg" style="background-color: ${p.color}20; color: ${p.color}; border: 1px solid ${p.color}40">P${p.id}</div>
+                    <div class="flex-1 grid grid-cols-3 gap-3">
+                        <div class="flex flex-col"><span class="text-[8px] font-black text-slate-600 uppercase mb-1 flex items-center gap-1"><svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Arr</span><input type="number" value="${p.arrivalTime}" onchange="updateProcess(${p.id}, 'arrivalTime', this.value)" class="bg-transparent text-sm font-bold rounded focus:text-white outline-none w-full text-slate-300"></div>
+                        <div class="flex flex-col"><span class="text-[8px] font-black text-slate-600 uppercase mb-1 flex items-center gap-1"><svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Brs</span><input type="number" value="${p.burstTime}" onchange="updateProcess(${p.id}, 'burstTime', this.value)" class="bg-transparent text-sm font-bold rounded focus:text-white outline-none w-full text-slate-300"></div>
+                        <div class="flex flex-col"><span class="text-[8px] font-black text-slate-600 uppercase mb-1 flex items-center gap-1"><svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Pri</span><input type="number" value="${p.priority}" onchange="updateProcess(${p.id}, 'priority', this.value)" class="bg-transparent text-sm font-bold rounded focus:text-white outline-none w-full text-slate-300"></div>
+                    </div><button onclick="removeProcess(${p.id})" class="p-2.5 text-slate-700 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+                list.appendChild(div);
+            });
+        }
+
+        function updateProcess(id, f, v) { const p = processes.find(proc => proc.id === id); if (p) { p[f] = parseInt(v) || 0; if (f === 'burstTime') { p.totalBurst = p.burstTime; p.remainingTime = p.burstTime; } } }
+        function removeProcess(id) { processes = processes.filter(p => p.id !== id); renderProcessList(); }
+        function addRandomProcesses(n = 5) { if (simulationRunning) return; for (let i = 0; i < n; i++) { const id = processes.length > 0 ? Math.max(...processes.map(p => p.id)) + 1 : 1; processes.push(new Process(id, Math.floor(Math.random() * 15), Math.floor(Math.random() * 10) + 3, Math.floor(Math.random() * 9) + 1, COLORS[id % COLORS.length])); } renderProcessList(); }
+
+        function startSimulation() {
+            if (processes.length === 0) return;
+            simulationRunning = true; 
+            const sb = document.getElementById('startBtn'); if(sb) sb.classList.add('hidden'); 
+            const pb = document.getElementById('pauseBtn'); if(pb) pb.classList.remove('hidden');
+            disableInputs(true); currentTime = 0; initCores();
+            refProcesses = processes.map(p => { let cp = new Process(p.id, p.arrivalTime, p.burstTime, p.priority, p.color); cp.totalBurst = p.burstTime; return cp; });
+            processes.forEach(p => { p.remainingTime = p.burstTime; p.startTime = -1; });
+            timer = setInterval(tick, Math.max(80, Math.floor(1000 / parseFloat(document.getElementById('clockInput').value || 2.5))));
+        }
+
+        function tick() {
+            const algoSelect = document.getElementById('algoSelect'), quantumInput = document.getElementById('quantumInput'), queueModeSelect = document.getElementById('queueMode');
+            if(!algoSelect || !quantumInput || !queueModeSelect) return;
+            const algo = algoSelect.value, mode = queueModeSelect.value, quantum = parseInt(quantumInput.value);
+            if (mode === 'local') { processes.filter(p => p.arrivalTime === currentTime).forEach(p => { let best = cores[0], minLoad = Infinity; cores.forEach(c => { let load = c.localQueue.reduce((a, b) => a + b.remainingTime, 0) + (c.currentProcess ? c.currentProcess.remainingTime : 0); if (load < minLoad) { minLoad = load; best = c; } }); best.localQueue.push(p); }); }
+            cores.forEach(c => handleCoreExecution(c, (mode === 'global' ? processes.filter(p => p.arrivalTime <= currentTime && p.remainingTime > 0 && !cores.some(x => x.currentProcess === p)) : c.localQueue), algo, quantum, mode));
+            handleCoreExecution(referenceCore, refProcesses.filter(p => p.arrivalTime <= currentTime && p.remainingTime > 0 && referenceCore.currentProcess !== p), algo, quantum, 'global');
+            updateUI();
+            if (processes.every(p => p.remainingTime === 0) && refProcesses.every(p => p.remainingTime === 0)) stopSimulation(true);
+            currentTime++;
+        }
+
+        function handleCoreExecution(core, queue, algo, quantum, mode) {
+            let switchReq = false; const sorted = [...queue].sort((a, b) => { if (algo === 'SJF_NP') return a.burstTime - b.burstTime || a.arrivalTime - b.arrivalTime; if (algo === 'SRTF') return a.remainingTime - b.remainingTime || a.arrivalTime - b.arrivalTime; if (algo.includes('PRIO')) return a.priority - b.priority || a.arrivalTime - b.arrivalTime; return a.arrivalTime - b.arrivalTime; });
+            if (core.currentProcess) { if (algo === 'SRTF' && sorted.length > 0 && sorted[0].remainingTime < core.currentProcess.remainingTime) switchReq = true; else if (algo === 'PRIO_P' && sorted.length > 0 && sorted[0].priority < core.currentProcess.priority) switchReq = true; else if (algo === 'RR' && ++core.rrCounter >= quantum) switchReq = true; if (core.currentProcess.remainingTime <= 0) switchReq = true; }
+            if (switchReq && core.currentProcess) { if (core.currentProcess.remainingTime > 0 && mode === 'local') core.localQueue.push(core.currentProcess); core.currentProcess = null; core.rrCounter = 0; }
+            if (!core.currentProcess && sorted.length > 0) { core.currentProcess = sorted[0]; if (mode === 'local') core.localQueue = core.localQueue.filter(p => p.id !== core.currentProcess.id); if (core.currentProcess.startTime === -1) core.currentProcess.startTime = currentTime; core.rrCounter = 0; }
+            if (core.currentProcess) { 
+                core.currentProcess.remainingTime--; core.totalActiveTime++; core.timeline.push({ pid: core.currentProcess.id, color: core.currentProcess.color, burst: core.currentProcess.totalBurst, remaining: core.currentProcess.remainingTime }); 
+                if (core.currentProcess.remainingTime <= 0) { 
+                    core.currentProcess.endTime = currentTime + 1; 
+                    core.currentProcess.turnaroundTime = core.currentProcess.endTime - core.currentProcess.arrivalTime; 
+                    core.currentProcess.waitingTime = Math.max(0, core.currentProcess.turnaroundTime - core.currentProcess.totalBurst); 
+                    core.currentProcess = null; 
+                } 
+            } else core.timeline.push({ pid: null, color: '#020617' });
+        }
+
+        function updateQueueVisuals(mode) {
+            const container = document.getElementById('queueVizTrack'), title = document.getElementById('queueVizTitle');
+            if (!container) return; container.innerHTML = '';
+            if (mode === 'global') {
+                if (title) title.innerText = "Global Ready Queue";
+                const readyProcs = processes.filter(p => p.arrivalTime <= currentTime && p.remainingTime > 0 && !cores.some(c => c.currentProcess === p)).sort((a,b) => a.arrivalTime - b.arrivalTime); 
+                if (readyProcs.length === 0) { container.innerHTML = '<div class="text-xs text-slate-600 font-mono py-2 w-full text-center tracking-widest opacity-50 uppercase italic">QUEUE EMPTY</div>'; }
+                else { readyProcs.forEach(p => { container.appendChild(createQueueNode(p)); }); }
+            } else {
+                if (title) title.innerText = "Per-Core Local Queues";
+                const grid = document.createElement('div'); grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4 w-full";
+                cores.forEach(c => {
+                    const row = document.createElement('div'); row.className = "bg-black/30 p-3 rounded-xl border border-white/5 flex items-center gap-3";
+                    row.innerHTML = `<div class="text-[9px] font-black text-slate-500 w-12 shrink-0">CORE ${c.id + 1}</div>`;
+                    const qTrack = document.createElement('div'); qTrack.className = "flex gap-2 overflow-x-auto no-scrollbar flex-1 items-center";
+                    if (c.localQueue.length === 0) { qTrack.innerHTML = '<span class="text-[8px] text-slate-700 font-mono">EMPTY</span>'; }
+                    else { c.localQueue.forEach(p => { qTrack.appendChild(createQueueNode(p, true)); }); }
+                    row.appendChild(qTrack); grid.appendChild(row);
+                });
+                container.appendChild(grid);
+            }
+        }
+
+        function createQueueNode(p, mini=false) {
+            const div = document.createElement('div'); div.className = `${mini ? "w-8 h-8 text-[9px]" : "w-10 h-10 text-[10px]"} rounded-lg flex flex-col items-center justify-center font-black shadow-lg shrink-0 animate-in fade-in zoom-in duration-300`;
+            div.style.backgroundColor = `${p.color}20`; div.style.color = p.color; div.style.border = `1px solid ${p.color}40`;
+            div.innerHTML = `<span>P${p.id}</span><span class="text-[7px] opacity-70">${p.burstTime}</span>`; return div;
+        }
+
+        function syncAllScrolls(val) { document.querySelectorAll('.gantt-track, .time-labels-container').forEach(t => t.scrollLeft = val); }
+
+        function updateUI() {
+            const ctd = document.getElementById('currentTimeDisplay'); if(ctd) ctd.innerText = `Cycle: ${currentTime}`;
+            const nav = document.getElementById('timelineNavigator'); if(nav) nav.max = Math.max(0, (currentTime + 1) * 24 - 50); 
+            const navInfo = document.getElementById('navInfo'); if(navInfo) navInfo.innerText = `Range: 0 - ${currentTime}`;
+            const qm = document.getElementById('queueMode'); if(qm) updateQueueVisuals(qm.value);
+            
+            cores.forEach((c, i) => {
+                const indicator = document.getElementById(`indicator-${i}`), status = document.getElementById(`status-${i}`), dProcId = document.getElementById(`dispatch-proc-id-${i}`), dCore = document.getElementById(`dispatch-core-${i}`);
+                if (c.currentProcess) { 
+                    if(indicator) indicator.className = 'w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_12px_#22d3ee]'; 
+                    if(status) status.innerHTML = `<span style="color:${c.currentProcess.color}">P${c.currentProcess.id}</span> <span class="text-[9px] text-slate-500 ml-1">${c.currentProcess.remainingTime} REM</span>`; 
+                    if(dProcId) { dProcId.innerText = `P${c.currentProcess.id}`; dProcId.style.color = c.currentProcess.color; }
+                    if(dCore) dCore.classList.add('animate-pulse-cyan'); updateProgressRing(i, ((c.currentProcess.totalBurst - c.currentProcess.remainingTime) / c.currentProcess.totalBurst) * 100, c.currentProcess.color); 
+                } else { 
+                    if(indicator) indicator.className = 'w-2 h-2 rounded-full bg-slate-800 shadow-none'; 
+                    if(status) status.innerText = 'IDLE'; if(dProcId) { dProcId.innerText = `OFF`; dProcId.style.color = "#475569"; }
+                    if(dCore) dCore.classList.remove('animate-pulse-cyan'); updateProgressRing(i, 0, '#0f172a'); 
+                }
+                const track = document.getElementById(`track-${i}`);
+                if(track && c.timeline.length > 0) {
+                    const block = document.createElement('div'); block.className = 'gantt-block'; 
+                    block.style.backgroundColor = c.timeline[c.timeline.length - 1].color; 
+                    block.innerText = c.timeline[c.timeline.length - 1].pid ? `P${c.timeline[c.timeline.length - 1].pid}` : ''; track.appendChild(block);
+                }
+                const labels = document.getElementById(`labels-${i}`);
+                if(labels) { const label = document.createElement('div'); label.className = 'time-label'; label.innerText = currentTime; labels.appendChild(label); }
+                const coreUtilDisplay = document.getElementById(`core-util-${i}`);
+                if(coreUtilDisplay) coreUtilDisplay.innerText = `${Math.round((c.totalActiveTime / (currentTime + 1)) * 100)}% Load`;
+            });
+
+            const refP = referenceCore.currentProcess;
+            const rdp = document.getElementById('dispatch-proc-id-ref'); 
+            const rdc = document.getElementById('dispatch-core-ref');
+            if(rdp) { rdp.innerText = refP ? `P${refP.id}` : 'OFF'; rdp.style.color = refP ? refP.color : '#475569'; }
+            if(rdc && refP) rdc.classList.add('animate-pulse-cyan'); else if(rdc) rdc.classList.remove('animate-pulse-cyan');
+            updateProgressRing('ref', refP ? ((refP.totalBurst - refP.remainingTime) / refP.totalBurst) * 100 : 0, refP ? refP.color : '#0f172a');
+
+            const rt = document.getElementById('referenceTrack');
+            if(rt && referenceCore.timeline.length > 0) {
+                const block = document.createElement('div'); block.className = 'gantt-block'; 
+                block.style.backgroundColor = referenceCore.timeline[referenceCore.timeline.length - 1].color; 
+                block.innerText = referenceCore.timeline[referenceCore.timeline.length - 1].pid ? `P${referenceCore.timeline[referenceCore.timeline.length - 1].pid}` : ''; rt.appendChild(block);
+            }
+            const rl = document.getElementById('referenceTimeLabels');
+            if(rl) { const label = document.createElement('div'); label.className = 'time-label'; label.innerText = currentTime; rl.appendChild(label); }
+            
+            if(simulationRunning) {
+                const scrollTarget = currentTime * 24;
+                if(nav) nav.value = scrollTarget;
+                syncAllScrolls(scrollTarget);
+            }
+            calculateStats();
+        }
+
+        function calculateStats() {
+            const fm = processes.filter(p => p.remainingTime === 0);
+            if (fm.length > 0) { 
+                const aw = document.getElementById('avgWait'), at = document.getElementById('avgTat'), ac = document.getElementById('avgCtMulti');
+                if(aw) aw.innerText = (fm.reduce((a, p) => a + p.waitingTime, 0) / fm.length).toFixed(2);
+                if(at) at.innerText = (fm.reduce((a, p) => a + p.turnaroundTime, 0) / fm.length).toFixed(2);
+                if(ac) ac.innerText = (fm.reduce((a, p) => a + p.endTime, 0) / fm.length).toFixed(2);
+            }
+            const fr = refProcesses.filter(p => p.remainingTime === 0); if (fr.length > 0) { const tt = document.getElementById('totalTimeRef'); if(tt) tt.innerText = Math.max(...fr.map(p => p.endTime)); }
+            const totalActive = cores.reduce((a, b) => a + b.totalActiveTime, 0);
+            const util = Math.round((totalActive / (cores.length * (currentTime + 1) || 1)) * 100);
+            const utl = document.getElementById('utilization'), ub = document.getElementById('utilBar');
+            if(utl) utl.innerText = `${util}%`; if(ub) ub.style.width = `${util}%`;
+        }
+
+        function stopSimulation(res = true) {
+            clearInterval(timer); simulationRunning = false; 
+            const startBtn = document.getElementById('startBtn'); if(startBtn) startBtn.classList.remove('hidden'); 
+            const pauseBtn = document.getElementById('pauseBtn'); if(pauseBtn) pauseBtn.classList.add('hidden'); 
+            disableInputs(false); calculateStats(); 
+            if (res) { document.getElementById('modalTitle').innerText = "Simulation Complete"; document.getElementById('modalMsg').innerText = "Sequential and Parallel execution cycles finalized."; document.getElementById('modalOverlay').classList.remove('hidden'); }
+        }
+
+        function resetSimulation() {
+            stopSimulation(false); processes = []; refProcesses = []; 
+            const algoSelect = document.getElementById('algoSelect'); if(algoSelect) algoSelect.selectedIndex = 0;
+            const coreSelect = document.getElementById('coreSelect'); if(coreSelect) coreSelect.value = "12";
+            const queueMode = document.getElementById('queueMode'); if(queueMode) queueMode.value = "global";
+            const clockInput = document.getElementById('clockInput'); if(clockInput) clockInput.value = "2.5";
+            const clockDisplay = document.getElementById('clockValDisplay'); if(clockDisplay) clockDisplay.innerText = "2.5 GHz"; 
+            const qc = document.getElementById('quantumContainer'); if(qc) qc.classList.add('hidden');
+            initCores(); addRandomProcesses(3); renderProcessList();
+            ['avgWait', 'avgTat', 'avgCtMulti'].forEach(id => { const el = document.getElementById(id); if(el) el.innerText = '0.00'; }); 
+            const ttRef = document.getElementById('totalTimeRef'); if(ttRef) ttRef.innerText = '0';
+            const utl = document.getElementById('utilization'); if(utl) utl.innerText = '0%';
+            const ub = document.getElementById('utilBar'); if(ub) ub.style.width = '0%';
+            const ctd = document.getElementById('currentTimeDisplay'); if(ctd) ctd.innerText = 'Cycle: 0'; 
+            const qvt = document.getElementById('queueVizTrack'); if(qvt) qvt.innerHTML = '<div class="text-[10px] text-slate-600 font-mono w-full text-center tracking-widest opacity-70 uppercase italic">Awaiting Input...</div>';
+            syncAllScrolls(0); const nav = document.getElementById('timelineNavigator'); if(nav) nav.value = 0;
+        }
+
+        function disableInputs(d) { ['algoSelect', 'coreSelect', 'queueMode', 'clockInput'].forEach(id => { const el = document.getElementById(id); if(el) el.disabled = d; }); }
+        function closeModal() { document.getElementById('modalOverlay').classList.add('hidden'); }
+        function openAddModal() { if(!simulationRunning) document.getElementById('addModalOverlay').classList.remove('hidden'); }
+        function closeAddModal() { const el = document.getElementById('addModalOverlay'); if(el) el.classList.add('hidden'); }
+
+        window.onload = () => {
+            initCores(); addRandomProcesses(3);
+            document.getElementById('startBtn').addEventListener('click', startSimulation);
+            document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+            document.getElementById('randomBtn').addEventListener('click', () => addRandomProcesses(5));
+            document.getElementById('addProcessBtn').addEventListener('click', openAddModal);
+            document.getElementById('confirmAddBtn').addEventListener('click', () => {
+                const id = processes.length > 0 ? Math.max(...processes.map(p => p.id)) + 1 : 1;
+                processes.push(new Process(id, document.getElementById('manualArrival').value, document.getElementById('manualBurst').value, document.getElementById('manualPriority').value, COLORS[id % COLORS.length]));
+                renderProcessList(); closeAddModal();
+            });
+            const clock = document.getElementById('clockInput');
+            if(clock) clock.addEventListener('input', (e) => document.getElementById('clockValDisplay').innerText = `${parseFloat(e.target.value).toFixed(1)} GHz`);
+            const nav = document.getElementById('timelineNavigator');
+            if(nav) nav.addEventListener('input', (e) => syncAllScrolls(parseInt(e.target.value)));
+            const coreSel = document.getElementById('coreSelect');
+            if(coreSel) coreSel.addEventListener('change', initCores);
+            const algoSel = document.getElementById('algoSelect');
+            if(algoSel) algoSel.addEventListener('change', (e) => { const qc = document.getElementById('quantumContainer'); if(qc) qc.classList.toggle('hidden', e.target.value !== 'RR'); });
+            const pauseBtn = document.getElementById('pauseBtn');
+            if(pauseBtn) pauseBtn.addEventListener('click', () => { clearInterval(timer); simulationRunning = false; document.getElementById('startBtn').classList.remove('hidden'); document.getElementById('pauseBtn').classList.add('hidden'); disableInputs(false); });
+        };
+    </script>
+</body>
+</html>
